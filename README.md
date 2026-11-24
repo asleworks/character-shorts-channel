@@ -68,7 +68,7 @@ python3 scripts/render.py --scenes work/scenes.json --audio work/narration.mp3 \
 
 ### 15초 카드 예시
 
-[카드 전용 장면](examples/card_only/scenes.json), 로컬 합성 내레이션과 단어 타이밍이 들어 있습니다. `--words`를 사용하면 이 예시를 렌더할 때 Pillow와 FFmpeg만 필요합니다.
+[카드 전용 장면](examples/card_only/scenes.json)과 단어 타이밍이 들어 있습니다. 내레이션 파일은 [예시 안내](examples/card_only/README.md)대로 먼저 만드세요. `--words`를 사용하면 이 예시를 렌더할 때 Pillow와 FFmpeg만 필요합니다.
 
 ```bash
 python3 scripts/render.py --scenes examples/card_only/scenes.json \
