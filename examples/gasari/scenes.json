@@ -1,0 +1,26 @@
+[
+  {
+    "key": "S01",
+    "dialogue": "알람을 왜 다섯 번씩 끄는지 아세요? 가사리 보면 딱 답 나와요.",
+    "image": "images/S01.webp",
+    "screen_text": ["알람을 다섯 번 끄는 이유"]
+  },
+  {
+    "key": "S02",
+    "dialogue": "어젯밤 가사리는 5분 간격으로 알람을 다섯 개나 맞췄어요.",
+    "image": "images/S02.webp",
+    "screen_text": ["06:00 · 06:05 · 06:10 · 06:15 · 06:20"]
+  },
+  {
+    "key": "S03",
+    "dialogue": "내일은 무조건 일찍 일어난다며 혼자 엄청 뿌듯해했죠.",
+    "image": "images/S03.webp",
+    "screen_text": ["내일의 나 = 갓생"]
+  },
+  {
+    "key": "S04",
+    "dialogue": "그런데 첫 알람이 울리자마자",
+    "image": "images/S04.webp",
+    "screen_text": ["5분 뒤 다시 알림"]
+  }
+]
