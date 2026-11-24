@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble illustrated scenes and narration into a vertical short."""
+"""Assemble illustrated or infographic scenes and narration into a vertical short."""
 import argparse
 from bisect import bisect_right
 from dataclasses import dataclass
@@ -27,8 +27,9 @@ LANCZOS = Image.Resampling.LANCZOS
 class Scene:
     key: str
     dialogue: str
-    image: Path
+    image: Path | None
     screen_text: tuple[str, ...]
+    number: str | None = None
 
 
 @dataclass(frozen=True)
@@ -51,16 +52,31 @@ def read_scenes(path):
     scenes = []
     keys = set()
     for row in rows:
-        key, dialogue, image = (row[field] for field in ("key", "dialogue", "image"))
+        key, dialogue = (row[field] for field in ("key", "dialogue"))
         labels = row.get("screen_text", [])
-        if not all(isinstance(value, str) and value.strip() for value in (key, dialogue, image)):
-            raise ValueError("Each scene needs a nonempty key, dialogue and image path.")
+        if not all(isinstance(value, str) and value.strip() for value in (key, dialogue)):
+            raise ValueError("Each scene needs a nonempty key and dialogue.")
         if key in keys:
             raise ValueError(f"Duplicate scene key: {key}")
         if not isinstance(labels, list) or not all(isinstance(label, str) for label in labels):
             raise ValueError(f"{key}: screen_text must be an array of strings.")
+        kind = row.get("type", "image")
+        if kind == "image":
+            image = row.get("image")
+            if not isinstance(image, str) or not image.strip():
+                raise ValueError(f"{key}: image scenes need a nonempty image path.")
+            scene = Scene(key, dialogue, path.parent / image, tuple(labels))
+        elif kind == "card":
+            if not 1 <= len(labels) <= 3 or not all(label.strip() for label in labels):
+                raise ValueError(f"{key}: card scenes need one to three nonempty screen_text lines.")
+            number = row.get("number")
+            if number is not None and (not isinstance(number, str) or not number.strip()):
+                raise ValueError(f"{key}: card number must be a nonempty string.")
+            scene = Scene(key, dialogue, None, tuple(labels), number)
+        else:
+            raise ValueError(f"{key}: scene type must be image or card.")
         keys.add(key)
-        scenes.append(Scene(key, dialogue, path.parent / image, tuple(labels)))
+        scenes.append(scene)
     return scenes
 
 
@@ -264,6 +280,8 @@ class Layout:
         raise ValueError("On-screen text is too long to fit.")
 
     def background(self, scene, art, zoom):
+        if art is None:
+            return self.card_background(scene)
         canvas = Image.new("RGBA", (WIDTH, HEIGHT), PAPER)
         scale = zoom * min(WIDTH * 0.84 / art.width, HEIGHT * 0.46 / art.height)
         size = (max(1, round(art.width * scale)), max(1, round(art.height * scale)))
@@ -273,6 +291,27 @@ class Layout:
         for index, label in enumerate(scene.screen_text):
             self.text(canvas, label, WIDTH // 2, 240 + spacing * index,
                       min(96, round(spacing * 0.88)), WIDTH * 0.88, outline=5)
+        return canvas
+
+    def card_background(self, scene):
+        canvas = Image.new("RGBA", (WIDTH, HEIGHT), PAPER)
+        draw = ImageDraw.Draw(canvas)
+        center_x = WIDTH // 2
+        draw.rounded_rectangle((100, 250, 980, 1290), radius=64, fill="#fffdf6",
+                               outline=INK, width=5)
+        draw.ellipse((355, 335, 725, 705), fill="#ffce65", outline=INK, width=5)
+        if scene.number is None:
+            draw.polygon(((540, 405), (655, 520), (540, 635), (425, 520)), fill=INK)
+            draw.ellipse((512, 492, 568, 548), fill="#ffce65")
+        else:
+            self.text(canvas, scene.number, center_x, 520, 166, 286)
+
+        title, *details = scene.screen_text
+        self.text(canvas, title, center_x, 850, 110, 756)
+        if details:
+            draw.line((210, 953, 870, 953), fill=INK, width=4)
+        for index, label in enumerate(details):
+            self.text(canvas, label, center_x, 1040 + 105 * index, 64, 756)
         return canvas
 
 
@@ -342,7 +381,7 @@ def encode(video, track, scenes, art, layout, cuts, captions, frames, audio_end)
                     index = bisect_right(scene_frames, at) - 1
                     age = max(0, at - cuts[index]) * POSE_FPS // FPS
                     duration = (min(scene_frames[index + 1], audio_end) - cuts[index]) / FPS
-                    zoom = punch_zoom(age / POSE_FPS, duration)
+                    zoom = punch_zoom(age / POSE_FPS, duration) if art[index] is not None else 1.0
                     pose = index, zoom
                     if pose != previous_pose:
                         background = layout.background(scenes[index], art[index], zoom)
@@ -411,7 +450,8 @@ def write_report(path, scenes, cuts, onsets, captions, frames, metrics, alignmen
     for index, (scene, cut, onset) in enumerate(zip(scenes, cuts, onsets)):
         stop = cuts[index + 1] if index + 1 < len(cuts) else frames
         script = " / ".join(c.text for c in captions if cut <= c.frame < stop)
-        labels = " / ".join(scene.screen_text) or "—"
+        labels = " / ".join(([scene.number] if scene.number is not None else [])
+                            + list(scene.screen_text)) or "—"
         cut_start = (cut if index else 0) / FPS
         lines.append(f"| {markdown_cell(scene.key)} | {cut_start:.3f} | {onset:.3f} | "
                      f"{markdown_cell(script)} | {markdown_cell(labels)} |")
@@ -421,7 +461,7 @@ def write_report(path, scenes, cuts, onsets, captions, frames, metrics, alignmen
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scenes", type=Path, required=True, help="ordered scenes.json")
-    parser.add_argument("--audio", type=Path, required=True, help="narration MP3")
+    parser.add_argument("--audio", type=Path, required=True, help="narration audio, e.g. MP3 or WAV")
     parser.add_argument("--words", type=Path, help="JSON word timings [{w, s, e}], in seconds")
     parser.add_argument("--out", type=Path, required=True, help="output directory")
     parser.add_argument("--font", type=Path, help="path to a Korean font such as Noto Sans KR")
@@ -434,7 +474,7 @@ def main():
             if not shutil.which(program):
                 raise ValueError(f"Install {program} and add it to PATH.")
         scenes = read_scenes(args.scenes)
-        art = [scene_art(scene.image) for scene in scenes]
+        art = [scene_art(scene.image) if scene.image is not None else None for scene in scenes]
         layout = Layout(*find_font(args.font))
         info = media_info(args.audio)
         if not any(stream["codec_type"] == "audio" for stream in info["streams"]):

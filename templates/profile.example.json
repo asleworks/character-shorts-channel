@@ -1,0 +1,36 @@
+{
+  "channel_name": "<채널 이름>",
+  "field": "<분야>",
+  "character": {
+    "name": "<캐릭터 이름>",
+    "appearance": "<색, 실루엣, 변하지 않는 특징>",
+    "personality": "<성격과 반복 행동>",
+    "image_job_ids": {
+      "base": "<JOB_ID>",
+      "expression_sheet": "<JOB_ID>",
+      "strong_emotion": "<JOB_ID>"
+    },
+    "prompt_prefix": "<핵심 외형과 그림 스타일을 설명하는 장면 프롬프트 앞부분>",
+    "strong_emotion": {
+      "name": "<감정>",
+      "visual_rule": "<감정에 따라 달라지는 한 가지 특징>"
+    }
+  },
+  "voice": {
+    "id": "<VOICE_ID>",
+    "model": "elevenlabs_v4",
+    "stability": 0.5
+  },
+  "speech_style": {
+    "register": "<고른 말투>",
+    "rules": ["<호칭>", "<끝맺음>", "<속도와 쉼>"]
+  },
+  "production_mode": "recorded_card",
+  "series_topics": [
+    {
+      "id": "E01",
+      "title": "<첫 에피소드 주제>",
+      "status": "planned"
+    }
+  ]
+}
